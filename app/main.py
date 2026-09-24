@@ -16,6 +16,7 @@ from .core.logging import JsonLogger, Metrics, configure_logging
 from .core.operations import router as operations_router
 from .core.rate_limit import create_rate_limiter
 from .infrastructure.email import EmailService
+from .infrastructure.scanner import build_scanner
 from .infrastructure.storage import build_storage
 from .modules.admin.api import router as admin_router
 from .modules.admin.application import AdminService
@@ -71,7 +72,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 socket_timeout=3,
                 socket_connect_timeout=3,
             )
-        storage = build_storage(resolved.storage, logger, storage_redis)
+        scanner = build_scanner(resolved.storage, logger)
+        storage = build_storage(resolved.storage, logger, storage_redis, scanner)
         email = EmailService(resolved.email, logger)
 
         # Build domain applications after the low-level adapters. Cross-module
@@ -143,6 +145,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "application.ready",
             provider=resolved.database.url.split(":", 1)[0],
             storage=resolved.storage.provider,
+            scanner=scanner.provider,
+            email=resolved.email.mode,
             rate_limiter=limiter.name,
         )
         try:

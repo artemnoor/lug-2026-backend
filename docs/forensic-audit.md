@@ -66,8 +66,9 @@ Reference repository: [`artemnoor/lug-2026`](https://github.com/artemnoor/lug-20
 ### CRITICAL
 
 None reproduced as an immediate baseline exploit in the tested development flow.
-Production still depends on external TLS, secret management, private object storage,
-scanner, and backups.
+Production still depends on external TLS, secret management, private object
+storage/scanner/SMTP endpoints, and backups; local Compose now supplies concrete
+development implementations for those integration seams.
 
 ### HIGH
 
@@ -129,10 +130,11 @@ scanner, and backups.
   audit log, and encrypted email outbox. The runtime uses asyncpg SQL rather than
   SQLAlchemy ORM; the rebuild changes this to SQLAlchemy 2.x models and ports.
 - PostgreSQL is the shared production source of truth. Redis supplies shared rate
-  limiting and multipart intent state. Local disk is development-only; production
-  uses private S3-compatible storage, server-side encryption, signed URLs, and AV.
-- Email modes are local log and SMTP; production requires SMTP and encrypted
-  durable outbox state.
+  limiting and multipart intent state. Local disk is development-only; the
+  rebuilt Compose environment uses MinIO, while production uses private
+  S3-compatible storage, server-side encryption, signed URLs, and AV.
+- Email modes are local log and SMTP; local Compose runs Mailpit and production
+  requires a managed SMTP endpoint and encrypted durable outbox state.
 
 ## Target boundary decision
 

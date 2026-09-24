@@ -65,6 +65,24 @@ are sent after the registration transaction commits; a failed delivery leaves a
 safe pending verification that can be resent. External I/O is moved off the
 event loop through `asyncio.to_thread` adapters.
 
+## Infrastructure adapters and local Compose
+
+The application has explicit adapters for the dependencies that are commonly
+run outside the API process:
+
+- `S3Storage` uses boto3 and supports AWS S3 as well as MinIO through an
+  endpoint URL and path-style addressing;
+- `ClamAVScanner` speaks the networked `clamd` `PING`/`INSTREAM` protocol, while
+  `CommandScanner` remains available for a host-installed scanner;
+- `EmailService` supports SMTP and probes the configured server during
+  readiness; `log` remains the deterministic development fallback.
+
+`docker-compose.yml` runs PostgreSQL, Redis, MinIO, a bucket initializer,
+ClamAV and Mailpit. This is a real local integration environment, not a set of
+unused environment-variable examples. Managed production equivalents can be
+substituted without changing module/application code because the composition
+root selects the adapters from typed settings.
+
 ## Persistence
 
 The relational schema owns identity, relationships, status and authorization
@@ -129,9 +147,11 @@ The suite covers:
 - clean Alembic upgrade/downgrade/upgrade;
 - legacy route aliases and error serialization.
 
-External PostgreSQL, Redis, S3, scanner and SMTP checks are configuration-level
-seams; Docker/CI supplies PostgreSQL and Redis when those integration checks are
-needed. Local tests remain deterministic and do not require those services.
+Unit/API tests keep SQLite, local storage, log email and the in-memory limiter
+for deterministic feedback. Adapter tests cover the ClamAV wire protocol, and
+Compose smoke verification validates the concrete MinIO/ClamAV/Mailpit wiring.
+The same adapter contracts can point at managed PostgreSQL, S3, scanner and
+SMTP in staging/production.
 
 ## Intentional behavior changes
 

@@ -15,8 +15,9 @@ SQLAlchemy 2.x и Alembic. Reference implementation находится отде�
 - typed Pydantic request/response models, единый error envelope и generated
   OpenAPI;
 - Argon2id password hashing с read-only compatibility для legacy scrypt;
-- private local/S3 uploads, bounded streaming, MIME/magic validation, optional
-  scanner и выдача только после `scan_status=clean`;
+- private local/S3 uploads, bounded streaming, MIME/magic validation, scanner
+  adapters (ClamAV over `clamd` or legacy command) и выдача только после
+  `scan_status=clean`;
 - structured JSON logs, request/trace IDs, bounded metrics, liveness/readiness и
   rate-limiter seam для Redis.
 
@@ -38,10 +39,11 @@ Development defaults используют SQLite, local storage, log email и in
 rate limiter. Bootstrap admin создаётся из `LUG_ADMIN_EMAIL`/
 `LUG_ADMIN_PASSWORD`; эти значения по умолчанию разрешены только в development.
 
-Для PostgreSQL/Redis/S3/SMTP задайте соответствующие параметры из
-[`.env.example`](.env.example). Production/staging configuration намеренно
-отказывается стартовать с SQLite, wildcard hosts, короткими secrets, неявным
-operations token или logging verification codes.
+Для ручного локального запуска задайте соответствующие параметры PostgreSQL,
+Redis, S3/MinIO, scanner и SMTP из [`.env.example`](.env.example).
+Production/staging configuration намеренно отказывается стартовать с SQLite,
+wildcard hosts, короткими secrets, неявным operations token или logging
+verification codes.
 
 ## Миграции и запуск через Docker
 
@@ -52,9 +54,13 @@ operations; startup не выполняет DDL. Для локального п�
 docker compose up --build
 ```
 
-Compose поднимает только реальные зависимости текущего backend: API, PostgreSQL
-и Redis. S3 и SMTP подключаются внешней конфигурацией, а не добавляются как
-фиктивные сервисы.
+Compose поднимает полный локальный dependency set: API, PostgreSQL, Redis,
+MinIO (S3-compatible storage с автоматическим bucket init), ClamAV `clamd` и
+Mailpit. UI MinIO доступен на `http://localhost:9001`, Mailpit — на
+`http://localhost:8025`; API использует их через сетевые adapters, поэтому
+локальная конфигурация проверяет тот же integration path, что и deployment.
+В production эти контейнеры можно заменить managed S3/ClamAV/SMTP, сохранив
+те же typed configuration seams.
 
 ## Проверки
 

@@ -20,6 +20,22 @@ class EmailService:
         self.settings = settings
         self.logger = logger
 
+    async def ready(self) -> bool:
+        """Check the configured delivery adapter without sending a message."""
+
+        if self.settings.mode == "log":
+            return True
+        try:
+            await asyncio.to_thread(self._probe_smtp)
+        except (OSError, ValueError, smtplib.SMTPException):
+            self.logger.warning(
+                "email.ready.failed",
+                host=self.settings.smtp_host,
+                port=self.settings.smtp_port,
+            )
+            return False
+        return True
+
     async def send(self, recipient: str, subject: str, text: str, html: str = "") -> None:
         self.logger.info(
             "email.send.start", recipient=recipient, subject=subject, mode=self.settings.mode
@@ -54,3 +70,19 @@ class EmailService:
             if self.settings.smtp_user:
                 client.login(self.settings.smtp_user, self.settings.smtp_password)
             client.send_message(message)
+
+    def _probe_smtp(self) -> None:
+        if self.settings.smtp_ssl:
+            with smtplib.SMTP_SSL(
+                self.settings.smtp_host, self.settings.smtp_port, timeout=5
+            ) as client:
+                if self.settings.smtp_user:
+                    client.login(self.settings.smtp_user, self.settings.smtp_password)
+                client.noop()
+            return
+        with smtplib.SMTP(self.settings.smtp_host, self.settings.smtp_port, timeout=5) as client:
+            if self.settings.smtp_starttls:
+                client.starttls()
+            if self.settings.smtp_user:
+                client.login(self.settings.smtp_user, self.settings.smtp_password)
+            client.noop()

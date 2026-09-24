@@ -52,7 +52,8 @@ async def ready(request: Request, app_container: Container):
     db_ready = await ping_database(app_container.engine)
     rate_ready = await app_container.rate_limiter.ready()
     storage_ready = await app_container.storage.ready()
-    if not (db_ready and rate_ready and storage_ready):
+    email_ready = await app_container.email.ready()
+    if not (db_ready and rate_ready and storage_ready and email_ready):
         return json_response(
             {
                 "status": "not_ready",
@@ -61,6 +62,7 @@ async def ready(request: Request, app_container: Container):
                     "database": db_ready,
                     "rateLimiter": rate_ready,
                     "storage": storage_ready,
+                    "email": email_ready,
                 },
             },
             503,

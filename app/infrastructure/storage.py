@@ -8,8 +8,6 @@ import mimetypes
 import os
 import re
 import secrets
-import shlex
-import subprocess
 import tempfile
 from collections.abc import AsyncIterable
 from pathlib import Path
@@ -21,6 +19,7 @@ from fastapi.responses import FileResponse, Response
 from ..core.config import StorageSettings
 from ..core.errors import ValidationAppError
 from ..core.logging import JsonLogger
+from .scanner import ScannerAdapter, build_scanner
 
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,254}$")
 _EXTENSIONS = {
@@ -70,9 +69,12 @@ class StorageAdapter(Protocol):
 class LocalStorage:
     provider = "local"
 
-    def __init__(self, settings: StorageSettings, logger: JsonLogger) -> None:
+    def __init__(
+        self, settings: StorageSettings, logger: JsonLogger, scanner: ScannerAdapter
+    ) -> None:
         self.settings = settings
         self.logger = logger
+        self.scanner = scanner
         self.root = settings.upload_dir
         self.root.mkdir(parents=True, exist_ok=True)
         settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -80,7 +82,7 @@ class LocalStorage:
     async def ready(self) -> bool:
         try:
             await asyncio.to_thread(self.root.mkdir, parents=True, exist_ok=True)
-            return os.access(self.root, os.W_OK)
+            return os.access(self.root, os.W_OK) and await self.scanner.ready()
         except OSError:
             return False
 
@@ -117,7 +119,7 @@ class LocalStorage:
                     "Размер файла не совпадает с заявленным.", "UPLOAD_SIZE_MISMATCH"
                 )
             _validate_magic(bytes(prefix), content_type)
-            scan_status = await _scan_path(path, self.settings)
+            scan_status = await self.scanner.scan_path(path)
             if scan_status != "clean":
                 raise ValidationAppError(
                     "Файл не прошёл проверку безопасности.", "UPLOAD_SCAN_REJECTED"
@@ -189,13 +191,19 @@ class S3Storage:
     provider = "s3"
 
     def __init__(
-        self, settings: StorageSettings, logger: JsonLogger, redis_client: Any | None = None
+        self,
+        settings: StorageSettings,
+        logger: JsonLogger,
+        redis_client: Any | None = None,
+        scanner: ScannerAdapter | None = None,
     ) -> None:
         self.settings = settings
         self.logger = logger
         self.redis = redis_client
+        self.scanner = scanner or build_scanner(settings, logger)
         self._intents: dict[str, dict[str, Any]] = {}
         import boto3
+        from botocore.config import Config
 
         self.client = boto3.client(
             "s3",
@@ -203,12 +211,15 @@ class S3Storage:
             endpoint_url=settings.s3_endpoint_url or None,
             aws_access_key_id=settings.s3_access_key or None,
             aws_secret_access_key=settings.s3_secret_key or None,
+            config=Config(
+                s3={"addressing_style": ("path" if settings.s3_force_path_style else "auto")}
+            ),
         )
 
     async def ready(self) -> bool:
         try:
             await asyncio.to_thread(self.client.head_bucket, Bucket=self.settings.s3_bucket)
-            return True
+            return await self.scanner.ready()
         except Exception:
             return False
 
@@ -268,7 +279,7 @@ class S3Storage:
         self, name: str, content_type: str, size: int, kind: str, owner_subject: str
     ) -> dict[str, Any]:
         _validate_metadata(name, content_type, kind, size, self.settings.max_upload_bytes)
-        if self.settings.upload_scan_required and not self.settings.upload_scan_command:
+        if self.settings.upload_scan_required and self.scanner.provider == "none":
             raise ValidationAppError("Проверка файлов не настроена.", "UPLOAD_SCANNER_UNAVAILABLE")
         key = f"{self.settings.s3_prefix}/{secrets.token_hex(24)}{_extension(name, content_type)}"
         kwargs: dict[str, Any] = {
@@ -386,7 +397,7 @@ class S3Storage:
             return "clean"
         path = await asyncio.to_thread(_write_temp_file, data)
         try:
-            return await _scan_path(path, self.settings)
+            return await self.scanner.scan_path(path)
         finally:
             await asyncio.to_thread(_unlink, path)
 
@@ -397,7 +408,7 @@ class S3Storage:
             _download_temp_file, self.client, self.settings.s3_bucket, key
         )
         try:
-            return await _scan_path(path, self.settings)
+            return await self.scanner.scan_path(path)
         finally:
             await asyncio.to_thread(_unlink, path)
 
@@ -424,24 +435,6 @@ def _unlink(path: Path) -> None:
         path.unlink()
     except FileNotFoundError:
         pass
-
-
-async def _scan_path(path: Path, settings: StorageSettings) -> str:
-    if not settings.upload_scan_required:
-        return "clean"
-    if not settings.upload_scan_command:
-        return "rejected"
-    try:
-        result = await asyncio.to_thread(
-            subprocess.run,
-            shlex.split(settings.upload_scan_command) + [str(path)],
-            capture_output=True,
-            timeout=30,
-            check=False,
-        )
-        return "clean" if result.returncode == 0 else "rejected"
-    except (OSError, subprocess.SubprocessError, ValueError):
-        return "rejected"
 
 
 def _write_temp_file(data: bytes) -> Path:
@@ -513,10 +506,14 @@ def _validate_magic(prefix: bytes, content_type: str) -> None:
 
 
 def build_storage(
-    settings: StorageSettings, logger: JsonLogger, redis_client: Any | None = None
+    settings: StorageSettings,
+    logger: JsonLogger,
+    redis_client: Any | None = None,
+    scanner: ScannerAdapter | None = None,
 ) -> StorageAdapter:
+    resolved_scanner = scanner or build_scanner(settings, logger)
     return (
-        S3Storage(settings, logger, redis_client)
+        S3Storage(settings, logger, redis_client, resolved_scanner)
         if settings.provider == "s3"
-        else LocalStorage(settings, logger)
+        else LocalStorage(settings, logger, resolved_scanner)
     )

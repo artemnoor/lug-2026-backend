@@ -14,10 +14,16 @@ an operations endpoint.
 
 ## Docker
 
-`docker compose up --build` starts the API with PostgreSQL and Redis. The API
-container runs `alembic upgrade head` before Uvicorn. Volumes persist database
-and local uploads. For production, replace local storage with S3 and provide
-TLS/database, SMTP, secrets and a scanner through environment/secret management.
+`docker compose up --build` starts the API with PostgreSQL, Redis, MinIO,
+ClamAV and Mailpit. The API container runs `alembic upgrade head` before
+Uvicorn. MinIO creates the `lug` bucket through the one-shot `minio-init`
+container; its console is at `http://localhost:9001`. Mailpit's inbox is at
+`http://localhost:8025`. Uploads use the ClamAV network scanner and email uses
+SMTP on port `1025`.
+
+For production, replace these local dependency containers with managed/private
+S3, ClamAV and SMTP equivalents through the typed environment settings. Do not
+reuse the development credentials from Compose.
 
 ## Logs and incidents
 

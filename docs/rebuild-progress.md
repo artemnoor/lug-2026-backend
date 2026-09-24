@@ -2,9 +2,10 @@
 
 ## Current phase
 
-Phase 8 verification and final architecture audit are complete. The detailed
-ultra plan was maintained in the parent workspace; this repository contains the
-implementation evidence and final audit below.
+Phase 8 verification and final architecture audit are complete; this follow-up
+also closed the local dependency integration gap. The detailed ultra plan was
+maintained in the parent workspace; this repository contains the implementation
+evidence and final audit below.
 
 ## Completed evidence
 
@@ -68,6 +69,7 @@ implementation evidence and final audit below.
 | 2026-09-24 | Security/authorization regression coverage added | `tests/test_security_and_capabilities.py` |
 | 2026-09-24 | Final audit fixed PostgreSQL TLS propagation, enforced JSON body limits, completed S3 scan/size gates, and corrected generated OpenAPI error/security metadata | `app/core/database.py`, `app/core/http.py`, `app/infrastructure/storage.py`, `app/main.py` |
 | 2026-09-24 | Legacy importer regression fixture and package discovery added | `tests/test_legacy_import.py`, `pyproject.toml` |
+| 2026-09-24 | Replaced S3/scanner/SMTP configuration-only local setup with concrete MinIO, ClamAV and Mailpit Compose services; added network scanner adapter and dependency readiness checks | `docker-compose.yml`, `app/infrastructure/scanner.py`, `app/infrastructure/storage.py`, `app/infrastructure/email.py`, `tests/test_local_dependencies.py` |
 
 ## Verification evidence
 
@@ -91,10 +93,12 @@ implementation evidence and final audit below.
 ## Environment-only verification
 
 - PostgreSQL migration integration was verified against a temporary PostgreSQL
-  16 container. Redis/S3/SMTP runtime calls still require configured external
-  credentials; deterministic API tests use SQLite/local storage/log email/
-  in-memory limiter.
-- `docker compose config --quiet` passes. The Docker image build reaches package
+  16 container. Deterministic API tests use SQLite/local storage/log email/
+  in-memory limiter; the new adapter test exercises the ClamAV `PING`/`INSTREAM`
+  protocol with a fake daemon.
+- `docker compose config --quiet` passes and resolves API, PostgreSQL, Redis,
+  MinIO, bucket initialization, ClamAV and Mailpit. A full image build reaches package
   metadata successfully but this environment's Docker network cannot complete
   TLS downloads from PyPI (`SSLEOFError`); the Dockerfile/package discovery issue
-  was fixed and the remaining failure is external to the source tree.
+  was fixed. The dependency-stack pull is likewise blocked by the local Docker
+  daemon proxy refusing `registry-1.docker.io:443`; no containers were created.

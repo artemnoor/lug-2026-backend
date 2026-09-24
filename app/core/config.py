@@ -68,6 +68,10 @@ class StorageSettings(BaseModel):
     provider: str = "local"
     data_dir: Path = Path("./data")
     upload_dir: Path = Path("./uploads")
+    scanner_provider: str = "none"
+    scanner_host: str = "clamav"
+    scanner_port: int = Field(default=3310, ge=1, le=65_535)
+    scanner_timeout_seconds: float = Field(default=30.0, ge=1.0, le=300.0)
     upload_scan_command: str = ""
     upload_scan_required: bool = False
     max_upload_bytes: int = Field(default=250 * 1024 * 1024, ge=1, le=2 * 1024 * 1024 * 1024)
@@ -80,6 +84,7 @@ class StorageSettings(BaseModel):
     s3_endpoint_url: str = ""
     s3_access_key: str = ""
     s3_secret_key: str = ""
+    s3_force_path_style: bool = False
     s3_prefix: str = "uploads"
     s3_signed_url_ttl: int = Field(default=300, ge=60, le=3600)
     s3_server_side_encryption: str = "AES256"
@@ -138,8 +143,16 @@ class Settings(BaseModel):
         database_url = env.get("LUG_DATABASE_URL", env.get("DATABASE_URL", "")).strip()
         if not database_url:
             database_url = "sqlite+aiosqlite:///./data/lug.db"
-        provider = env.get(
-            "LUG_FILE_STORAGE_PROVIDER", "s3" if environment == "production" else "local"
+        provider = (
+            env.get("LUG_FILE_STORAGE_PROVIDER", "s3" if environment == "production" else "local")
+            .strip()
+            .lower()
+        )
+        upload_scan_command = env.get("LUG_UPLOAD_SCAN_COMMAND", "").strip()
+        scanner_provider = (
+            env.get("LUG_UPLOAD_SCANNER", "command" if upload_scan_command else "none")
+            .strip()
+            .lower()
         )
         settings = cls(
             root_dir=root_dir,
@@ -177,7 +190,11 @@ class Settings(BaseModel):
                 provider=provider,
                 data_dir=_path(env.get("LUG_DATA_DIR", str(root_dir / "data")), root_dir),
                 upload_dir=_path(env.get("LUG_UPLOAD_DIR", str(root_dir / "uploads")), root_dir),
-                upload_scan_command=env.get("LUG_UPLOAD_SCAN_COMMAND", "").strip(),
+                scanner_provider=scanner_provider,
+                scanner_host=env.get("LUG_UPLOAD_SCANNER_HOST", "clamav").strip(),
+                scanner_port=_int(env, "LUG_UPLOAD_SCANNER_PORT", 3310),
+                scanner_timeout_seconds=_float(env, "LUG_UPLOAD_SCANNER_TIMEOUT_SECONDS", 30.0),
+                upload_scan_command=upload_scan_command,
                 upload_scan_required=_bool(
                     env, "LUG_UPLOAD_SCAN_REQUIRED", environment == "production"
                 ),
@@ -193,6 +210,7 @@ class Settings(BaseModel):
                 s3_endpoint_url=env.get("LUG_S3_ENDPOINT_URL", "").strip(),
                 s3_access_key=env.get("LUG_S3_ACCESS_KEY", "").strip(),
                 s3_secret_key=env.get("LUG_S3_SECRET_KEY", ""),
+                s3_force_path_style=_bool(env, "LUG_S3_FORCE_PATH_STYLE", False),
                 s3_prefix=env.get("LUG_S3_PREFIX", "uploads").strip("/") or "uploads",
                 s3_signed_url_ttl=_int(env, "LUG_S3_SIGNED_URL_TTL", 300),
                 s3_server_side_encryption=env.get("LUG_S3_SERVER_SIDE_ENCRYPTION", "AES256"),
@@ -245,8 +263,8 @@ class Settings(BaseModel):
                 raise ValueError("staging/production requires explicit allowed hosts")
             if self.storage.provider != "s3" or not self.storage.s3_bucket:
                 raise ValueError("production requires configured private S3 storage")
-            if self.storage.upload_scan_required and not self.storage.upload_scan_command:
-                raise ValueError("production requires a configured upload scanner command")
+            if self.storage.upload_scan_required and self.storage.scanner_provider == "none":
+                raise ValueError("production requires a configured upload scanner")
             if self.email.mode != "smtp" or len(self.email.verification_secret) < 32:
                 raise ValueError("staging/production requires SMTP and a 32-character email secret")
             if not self.email.smtp_host:
@@ -255,6 +273,13 @@ class Settings(BaseModel):
                 raise ValueError("verification codes must not be logged in staging/production")
         if self.storage.provider not in {"local", "s3"}:
             raise ValueError("LUG_FILE_STORAGE_PROVIDER must be local or s3")
+        if self.storage.scanner_provider not in {"none", "command", "clamav"}:
+            raise ValueError("LUG_UPLOAD_SCANNER must be none, command, or clamav")
+        if self.storage.scanner_provider == "command" and self.storage.upload_scan_required:
+            if not self.storage.upload_scan_command:
+                raise ValueError("required command scanner needs LUG_UPLOAD_SCAN_COMMAND")
+        if self.storage.scanner_provider == "clamav" and not self.storage.scanner_host:
+            raise ValueError("ClamAV scanner requires LUG_UPLOAD_SCANNER_HOST")
         if self.storage.provider == "s3" and not self.storage.s3_bucket:
             raise ValueError("S3 storage requires LUG_S3_BUCKET")
         if bool(self.storage.s3_access_key) != bool(self.storage.s3_secret_key):
@@ -274,6 +299,13 @@ def _int(values: Mapping[str, str], key: str, default: int) -> int:
         return int(values.get(key, str(default)))
     except ValueError as exc:
         raise ValueError(f"{key} must be an integer") from exc
+
+
+def _float(values: Mapping[str, str], key: str, default: float) -> float:
+    try:
+        return float(values.get(key, str(default)))
+    except ValueError as exc:
+        raise ValueError(f"{key} must be a number") from exc
 
 
 def _bool(values: Mapping[str, str], key: str, default: bool) -> bool:

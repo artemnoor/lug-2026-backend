@@ -8,22 +8,40 @@ services:
       LUG_DATABASE_URL: postgresql+asyncpg://lug:lug@postgres:5432/lug
       LUG_DATABASE_SSL_MODE: disable
       REDIS_URL: redis://redis:6379/0
-      LUG_FILE_STORAGE_PROVIDER: local
-      LUG_DATA_DIR: /app/data
-      LUG_UPLOAD_DIR: /app/uploads
+      LUG_FILE_STORAGE_PROVIDER: s3
+      LUG_S3_BUCKET: lug
+      LUG_S3_REGION: us-east-1
+      LUG_S3_ENDPOINT_URL: http://minio:9000
+      LUG_S3_ACCESS_KEY: lugminio
+      LUG_S3_SECRET_KEY: lugminiosecret
+      LUG_S3_FORCE_PATH_STYLE: "true"
+      LUG_S3_SERVER_SIDE_ENCRYPTION: AES256
+      LUG_UPLOAD_SCANNER: clamav
+      LUG_UPLOAD_SCANNER_HOST: clamav
+      LUG_UPLOAD_SCANNER_PORT: "3310"
+      LUG_UPLOAD_SCANNER_TIMEOUT_SECONDS: "30"
+      LUG_UPLOAD_SCAN_REQUIRED: "true"
       LUG_ADMIN_EMAIL: admin@lug.local
       LUG_ADMIN_PASSWORD: Strong!Admin1
-      LUG_EMAIL_MODE: log
-      LUG_EMAIL_LOG_CODE: "true"
+      LUG_EMAIL_MODE: smtp
+      LUG_EMAIL_LOG_CODE: "false"
+      LUG_SMTP_HOST: mailpit
+      LUG_SMTP_PORT: "1025"
+      LUG_SMTP_FROM: no-reply@lug.local
+      LUG_SMTP_STARTTLS: "false"
+      LUG_SMTP_SSL: "false"
     ports:
       - "8000:8000"
-    volumes:
-      - lug_data:/app/data
-      - lug_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      clamav:
+        condition: service_healthy
+      mailpit:
         condition: service_healthy
     command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
 
@@ -49,7 +67,54 @@ services:
       timeout: 3s
       retries: 10
 
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-09-06T17-38-46Z
+    environment:
+      MINIO_ROOT_USER: lugminio
+      MINIO_ROOT_PASSWORD: lugminiosecret
+      # Development-only static KMS key so the API's AES256 SSE header works.
+      MINIO_KMS_SECRET_KEY: lug-local-key:OSMM+vkKUTCvQs9YL/CVMIMt43HFhkUpqJxTmGl6rYw=
+    command: ["server", "/data", "--console-address", ":9001"]
+    volumes:
+      - lug_minio:/data
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    environment:
+      MINIO_ROOT_USER: lugminio
+      MINIO_ROOT_PASSWORD: lugminiosecret
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
+      mc mb --ignore-existing local/lug
+
+  clamav:
+    image: clamav/clamav:stable
+    volumes:
+      - lug_clamav_db:/var/lib/clamav
+    expose:
+      - "3310"
+
+  mailpit:
+    image: axllent/mailpit:v1.31.1
+    environment:
+      MP_MAX_MESSAGES: "5000"
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
 volumes:
-  lug_data:
-  lug_uploads:
   lug_postgres:
+  lug_minio:
+  lug_clamav_db:
