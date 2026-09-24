@@ -1,0 +1,36 @@
+"""Persistence ports for authentication operations."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, Protocol
+
+
+class AuthRepository(Protocol):
+    async def get_user_by_email(self, email: str) -> Any | None: ...
+
+    async def get_user_by_id(self, user_id: str) -> Any | None: ...
+
+    async def get_user_by_session(self, token_hash: str, now: datetime) -> Any | None: ...
+
+    async def add_session(
+        self, user_id: str, token_hash: str, expires_at: datetime, user_agent: str, ip_address: str
+    ) -> None: ...
+
+    async def list_sessions(
+        self, user_id: str, current_token_hash: str, now: datetime
+    ) -> list[Any]: ...
+
+    async def revoke_session(self, token_hash: str) -> bool: ...
+
+    async def revoke_other_sessions(self, user_id: str, current_token_hash: str) -> int: ...
+
+    async def get_password_reset(self, email: str) -> Any | None: ...
+
+    async def create_password_reset(
+        self, email: str, code_hash: str, expires_at: datetime
+    ) -> Any: ...
+
+    async def save_password_reset(self, row: Any) -> None: ...
+
+    async def increment_password_reset_attempt(self, email: str) -> None: ...

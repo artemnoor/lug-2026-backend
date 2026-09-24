@@ -1,0 +1,19 @@
+"""Persistence port for portfolio operations."""
+
+from __future__ import annotations
+
+from typing import Any, Protocol
+
+
+class PortfolioRepository(Protocol):
+    async def get_user(self, user_id: str) -> Any | None: ...
+
+    async def get(self, achievement_id: str) -> Any | None: ...
+
+    async def list_for_user(self, user_id: str) -> list[Any]: ...
+
+    async def create(self, values: dict[str, Any]) -> Any: ...
+
+    async def delete(self, row: Any) -> None: ...
+
+    async def save(self, row: Any) -> None: ...

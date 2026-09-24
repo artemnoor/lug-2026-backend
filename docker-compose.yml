@@ -1,0 +1,55 @@
+services:
+  backend:
+    build: .
+    environment:
+      LUG_ENV: development
+      LUG_ROOT: /app
+      LUG_ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      LUG_DATABASE_URL: postgresql+asyncpg://lug:lug@postgres:5432/lug
+      LUG_DATABASE_SSL_MODE: disable
+      REDIS_URL: redis://redis:6379/0
+      LUG_FILE_STORAGE_PROVIDER: local
+      LUG_DATA_DIR: /app/data
+      LUG_UPLOAD_DIR: /app/uploads
+      LUG_ADMIN_EMAIL: admin@lug.local
+      LUG_ADMIN_PASSWORD: Strong!Admin1
+      LUG_EMAIL_MODE: log
+      LUG_EMAIL_LOG_CODE: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - lug_data:/app/data
+      - lug_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: lug
+      POSTGRES_USER: lug
+      POSTGRES_PASSWORD: lug
+    volumes:
+      - lug_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lug -d lug"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  lug_data:
+  lug_uploads:
+  lug_postgres:

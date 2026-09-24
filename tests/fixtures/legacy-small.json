@@ -1,0 +1,52 @@
+{
+  "settings": {
+    "minTeamPercentage": 60,
+    "isRegistrationOpen": true
+  },
+  "teams": [
+    {
+      "id": "legacy-team-1",
+      "group": "LEGACY-1",
+      "name": "Legacy Team",
+      "inviteCode": "INV-00112233445566778899AABBCCDDEEFF",
+      "captainId": "legacy-user-1",
+      "memberLimit": 1,
+      "reviewNameStatus": "approved",
+      "reviewGroupStatus": "approved",
+      "reviewFlagStatus": "approved",
+      "reviewDescriptionStatus": "approved"
+    }
+  ],
+  "users": [
+    {
+      "id": "legacy-user-1",
+      "email": "legacy@example.test",
+      "passwordHash": "scrypt$00112233445566778899aabbccddeeff$e4a8b3d569acbc2fa7e8d8347ee1dd3ddd23fc35e96ea7d227e48291fa78c079a36aebeb642228879b8c03f7eac540e36962722ed060682ad2866dfa6dab6b36",
+      "role": "participant",
+      "fio": "Legacy User",
+      "teamId": "legacy-team-1",
+      "emailVerified": true,
+      "identityStatus": "approved"
+    }
+  ],
+  "achievements": [
+    {
+      "id": "legacy-achievement-1",
+      "userId": "legacy-user-1",
+      "title": "Imported award",
+      "direction": "science",
+      "category": "Research",
+      "status": "approved",
+      "points": 10
+    }
+  ],
+  "notifications": [
+    {
+      "id": "legacy-notification-1",
+      "targetType": "all",
+      "kind": "system",
+      "title": "Imported",
+      "message": "Imported notification"
+    }
+  ]
+}
