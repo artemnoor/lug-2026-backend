@@ -14,12 +14,15 @@ an operations endpoint.
 
 ## Docker
 
-`docker compose up --build` starts the API with PostgreSQL, Redis, MinIO,
-ClamAV and Mailpit. The API container runs `alembic upgrade head` before
-Uvicorn. MinIO creates the `lug` bucket through the one-shot `minio-init`
-container; its console is at `http://localhost:9001`. Mailpit's inbox is at
-`http://localhost:8025`. Uploads use the ClamAV network scanner and email uses
-SMTP on port `1025`.
+The single Compose file for the website and API lives in the root of the main
+[`lug-2026` repository](https://github.com/artemnoor/lug-2026/blob/main/docker-compose.yml).
+From that repository's root, copy `.env.example` to `.env`, set a local admin
+password, then run `docker compose up --build -d`. The API container runs
+`alembic upgrade head` before Uvicorn. MinIO creates the `lug` bucket through
+the one-shot `minio-init` container; its console is at
+`http://127.0.0.1:9001`. Mailpit's inbox is at `http://127.0.0.1:8025`.
+Uploads use the ClamAV network scanner and email uses SMTP on port `1025`.
+Use `docker compose down` to stop the services while preserving named volumes.
 
 For production, replace these local dependency containers with managed/private
 S3, ClamAV and SMTP equivalents through the typed environment settings. Do not

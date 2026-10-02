@@ -77,11 +77,12 @@ run outside the API process:
 - `EmailService` supports SMTP and probes the configured server during
   readiness; `log` remains the deterministic development fallback.
 
-`docker-compose.yml` runs PostgreSQL, Redis, MinIO, a bucket initializer,
-ClamAV and Mailpit. This is a real local integration environment, not a set of
-unused environment-variable examples. Managed production equivalents can be
-substituted without changing module/application code because the composition
-root selects the adapters from typed settings.
+The root `docker-compose.yml` in the main website repository runs the web app,
+API, PostgreSQL, Redis, MinIO, a bucket initializer, ClamAV and Mailpit. This is
+a real local integration environment, not a set of unused environment-variable
+examples. Managed production equivalents can be substituted without changing
+module/application code because the composition root selects the adapters from
+typed settings.
 
 ## Persistence
 
@@ -148,10 +149,10 @@ The suite covers:
 - legacy route aliases and error serialization.
 
 Unit/API tests keep SQLite, local storage, log email and the in-memory limiter
-for deterministic feedback. Adapter tests cover the ClamAV wire protocol, and
-Compose smoke verification validates the concrete MinIO/ClamAV/Mailpit wiring.
-The same adapter contracts can point at managed PostgreSQL, S3, scanner and
-SMTP in staging/production.
+for deterministic feedback. Adapter tests cover the ClamAV wire protocol. The
+main repository CI validates the root Compose configuration and builds both
+application images. The same adapter contracts can point at managed PostgreSQL,
+S3, scanner and SMTP in staging/production.
 
 ## Intentional behavior changes
 
