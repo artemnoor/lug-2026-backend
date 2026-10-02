@@ -11,7 +11,7 @@ from .common import DashboardResponse, StrictModel, TeamView, UserView
 
 class RegisterTeamRequest(StrictModel):
     fio: str = Field(max_length=200)
-    group: str = Field(max_length=100)
+    group: str = Field(default="", max_length=100)
     team_name: str = Field(default="", alias="teamName", max_length=200)
     email: str = Field(max_length=254)
     phone: str = Field(default="", max_length=32)
@@ -70,6 +70,10 @@ class TeamResponse(StrictModel):
 
 
 class VerifyEmailResponse(StrictModel):
+    user: UserView
+
+
+class RegistrationResponse(StrictModel):
     user: UserView
 
 

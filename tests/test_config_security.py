@@ -6,6 +6,7 @@ import pytest
 
 from app.core.config import DatabaseSettings, Settings
 from app.core.database import postgres_connect_args
+from app.core.security import strong_password
 
 
 def _production_values() -> dict[str, str]:
@@ -57,3 +58,9 @@ def test_postgres_tls_policy_reaches_asyncpg_connect_args():
     assert isinstance(context, ssl.SSLContext)
     assert context.verify_mode == ssl.CERT_REQUIRED
     assert context.check_hostname is True
+
+
+def test_password_policy_requires_length_without_character_classes():
+    assert strong_password("password")
+    assert strong_password("толькоРусскиеБуквы")
+    assert not strong_password("short7!")

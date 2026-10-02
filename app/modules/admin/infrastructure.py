@@ -65,11 +65,7 @@ class SqlAlchemyAdminRepository(AdminRepository):
 
     async def broadcast_targets(self) -> tuple[list[UserRow], list[TeamRow]]:
         users = list(
-            (
-                await self.session.scalars(
-                    select(UserRow).where(UserRow.role != "admin", UserRow.email_verified.is_(True))
-                )
-            ).all()
+            (await self.session.scalars(select(UserRow).where(UserRow.role != "admin"))).all()
         )
         teams = list((await self.session.scalars(select(TeamRow))).all())
         return users, teams

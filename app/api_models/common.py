@@ -77,6 +77,7 @@ class TeamView(StrictModel):
     is_admitted: bool = Field(default=False, alias="isAdmitted")
     video_card: VideoCard = Field(default_factory=VideoCard, alias="videoCard")
     members: list[UserView] = Field(default_factory=list)
+    quota: dict[str, Any] = Field(default_factory=dict)
 
 
 class AchievementView(StrictModel):

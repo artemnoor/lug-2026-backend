@@ -47,7 +47,9 @@ class TeamService:
             raise RuntimeError("Team repository is not configured")
         return self.repository_factory(session)
 
-    async def begin_registration(self, payload: dict[str, Any], kind: str) -> dict[str, Any]:
+    async def register(
+        self, payload: dict[str, Any], kind: str, user_agent: str = "", ip_address: str = ""
+    ) -> dict[str, Any]:
         values = domain.validate_registration(payload, kind == "team")
         async with self.uow_factory() as uow:
             repository = self._repository(uow.session)
@@ -88,14 +90,17 @@ class TeamService:
                     "REGISTRATION_UPLOAD_CLAIM_INVALID",
                 )
             if (
-                not str(values.get("studentCardType", "")).startswith("image/")
+                not (
+                    str(values.get("studentCardType", "")).startswith("image/")
+                    or str(values.get("studentCardType", "")).lower() == "application/pdf"
+                )
                 or int(values.get("studentCardSize") or 0) <= 0
             ):
                 raise ValidationAppError(
                     "Некорректные параметры загруженного документа.",
                     "REGISTRATION_UPLOAD_METADATA_INVALID",
                 )
-            existing = await repository.get_pending_by_email(values["email"])
+            await repository.discard_pending_by_email(values["email"])
             values["kind"] = kind
             values["passwordHash"] = await hash_password(values["password"])
             values["inviteCode"] = str(values.get("inviteCode", "")).strip().upper()
@@ -112,33 +117,11 @@ class TeamService:
                         "inviteExpiresAt": team_data["invite_expires_at"].isoformat(),
                     }
                 )
-            code = __import__(
-                "app.modules.auth.domain", fromlist=["new_verification_code"]
-            ).new_verification_code()
-            expires = now_utc() + timedelta(seconds=self.email_settings.verification_ttl_seconds)
-            row = await repository.save_pending(
-                values,
-                verification_hash(self.email_settings.verification_secret, code, "email"),
-                expires,
-                existing.id if existing else None,
-            )
-            self.logger.info(
-                "registration.pending", email=values["email"], verification_id=row.id, kind=kind
-            )
-            pending = {
-                "verificationRequired": True,
-                "verificationId": row.id,
-                "email": row.email,
-                "expiresAt": expires.isoformat(),
-                "message": "Код отправлен на почту. Проверьте входящие и папку «Спам».",
-            }
-        # External email delivery happens only after the database transaction
-        # has committed, so a failed SMTP call cannot leave a phantom request
-        # or a rolled-back request with an already sent code.
-        await self.email.send(
-            values["email"], "Подтверждение email — ЛУГ 2026", f"Ваш код подтверждения: {code}"
-        )
-        return pending
+            user_row = await repository.create_registered(values, now_utc())
+        token = await self.auth.issue_session(user_row.id, user_agent, ip_address)
+        await self.media.claim_upload_for_user(user_row.student_card_file, user_row.id)
+        self.logger.info("registration.completed", user_id=user_row.id, kind=kind)
+        return {"user": user_view(user_row), "token": token}
 
     async def verify_email(
         self, verification_id: str, code: str, user_agent: str = "", ip_address: str = ""

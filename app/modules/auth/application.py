@@ -52,7 +52,7 @@ class AuthService:
         async with self.uow_factory() as uow:
             repository = self.repository_factory(uow.session)
             row = await repository.get_user_by_email(normalized)
-            if row is None or not row.email_verified:
+            if row is None:
                 raise AuthenticationError(
                     "Неверный адрес электронной почты или пароль.", "AUTH_INVALID"
                 )

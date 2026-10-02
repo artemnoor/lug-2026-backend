@@ -12,6 +12,7 @@ from ...api_models.teams import (
     InviteRotationResponse,
     PendingRegistrationResponse,
     RegisterTeamRequest,
+    RegistrationResponse,
     ResendEmailRequest,
     TeamResponse,
     TeamUpdateRequest,
@@ -24,30 +25,54 @@ from ...core.http import enforce_rate_limit, json_response
 router = APIRouter(prefix="/api", tags=["Teams"])
 
 
+def _session_response(user: dict, token: str, request: Request, app_container: Container):
+    response = json_response({"user": user}, 201, request)
+    response.set_cookie(
+        "lug_session",
+        token,
+        max_age=app_container.settings.security.session_ttl_seconds,
+        httponly=True,
+        secure=app_container.settings.security.secure_cookies,
+        samesite="lax",
+        path="/",
+    )
+    return response
+
+
 @router.post(
     "/auth/register-team",
-    response_model=PendingRegistrationResponse,
-    status_code=202,
-    summary="Start team registration",
+    response_model=RegistrationResponse,
+    status_code=201,
+    summary="Register a team and start a session",
 )
 async def register_team(payload: RegisterTeamRequest, request: Request, app_container: Container):
     await enforce_rate_limit(app_container, request, "registration", 5)
     data = payload.model_dump(by_alias=True)
-    return json_response(await app_container.teams.begin_registration(data, "team"), 202, request)
+    result = await app_container.teams.register(
+        data,
+        "team",
+        request.headers.get("user-agent", ""),
+        request.client.host if request.client else "",
+    )
+    return _session_response(result["user"], result["token"], request, app_container)
 
 
 @router.post(
     "/auth/join-team",
-    response_model=PendingRegistrationResponse,
-    status_code=202,
-    summary="Start invite-based team join",
+    response_model=RegistrationResponse,
+    status_code=201,
+    summary="Join a team and start a session",
 )
 async def join_team(payload: RegisterTeamRequest, request: Request, app_container: Container):
     await enforce_rate_limit(app_container, request, "join", 10)
     data = payload.model_dump(by_alias=True)
-    return json_response(
-        await app_container.teams.begin_registration(data, "participant"), 202, request
+    result = await app_container.teams.register(
+        data,
+        "participant",
+        request.headers.get("user-agent", ""),
+        request.client.host if request.client else "",
     )
+    return _session_response(result["user"], result["token"], request, app_container)
 
 
 @router.post(

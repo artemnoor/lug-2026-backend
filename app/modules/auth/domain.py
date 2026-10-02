@@ -18,7 +18,7 @@ def validate_login(email: str, password: str) -> str:
 def validate_new_password(password: str) -> None:
     if not strong_password(password):
         raise ValidationAppError(
-            "Пароль должен содержать минимум 8 символов, строчные и заглавные буквы, цифру и спецсимвол.",
+            "Пароль должен содержать не менее 8 символов.",
             "PASSWORD_WEAK",
         )
 

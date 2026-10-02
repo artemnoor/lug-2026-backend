@@ -49,7 +49,7 @@ def validate_registration(values: dict[str, Any], is_team: bool) -> dict[str, An
         raise ValidationAppError("Укажите корректный адрес электронной почты.", "EMAIL_INVALID")
     if not strong_password(str(values.get("password"))):
         raise ValidationAppError(
-            "Пароль должен содержать минимум 8 символов, строчную и прописную букву, цифру и спецсимвол.",
+            "Пароль должен содержать не менее 8 символов.",
             "PASSWORD_INVALID",
         )
     contacts = normalize_contacts(values)

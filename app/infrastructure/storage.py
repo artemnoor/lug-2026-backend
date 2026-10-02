@@ -6,9 +6,9 @@ import asyncio
 import json
 import mimetypes
 import os
-import re
 import secrets
 import tempfile
+import unicodedata
 from collections.abc import AsyncIterable
 from pathlib import Path
 from typing import Any, Protocol
@@ -21,7 +21,6 @@ from ..core.errors import ValidationAppError
 from ..core.logging import JsonLogger
 from .scanner import ScannerAdapter, build_scanner
 
-_SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,254}$")
 _EXTENSIONS = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
@@ -472,7 +471,7 @@ def _download_temp_file(client: Any, bucket: str, key: str) -> Path:
 
 
 def _validate_metadata(name: str, content_type: str, kind: str, size: int, maximum: int) -> None:
-    if not name or len(name) > 255 or Path(name).name != name or not _SAFE_NAME.fullmatch(name):
+    if not _is_safe_name(name):
         raise ValidationAppError("Недопустимое имя файла.", "UPLOAD_INVALID_NAME")
     if not content_type or content_type not in _EXTENSIONS:
         raise ValidationAppError("Недопустимый тип файла.", "UPLOAD_INVALID_TYPE")
@@ -480,6 +479,17 @@ def _validate_metadata(name: str, content_type: str, kind: str, size: int, maxim
         raise ValidationAppError("Недопустимый вид загрузки.", "UPLOAD_INVALID_KIND")
     if size < 0 or size > maximum:
         raise ValidationAppError("Файл превышает допустимый размер.", "UPLOAD_TOO_LARGE")
+
+
+def _is_safe_name(name: str) -> bool:
+    if not name or len(name) > 255 or Path(name).name != name or not name[0].isalnum():
+        return False
+    return all(
+        character.isalnum()
+        or unicodedata.category(character).startswith("M")
+        or character in "._ -"
+        for character in name
+    )
 
 
 def _extension(name: str, content_type: str) -> str:

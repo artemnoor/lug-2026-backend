@@ -21,13 +21,13 @@ operation on `/uploads/{filename}`.
 | `POST /api/auth/request-password-reset` | Generic `202`, HMAC reset code delivery | `auth.request_password_reset` | compatible; avoid account enumeration |
 | `POST /api/auth/reset-password` | Code/password reset; revoke sessions; `200` | `auth.reset_password` | compatible; preserve one-time code |
 | `POST /api/auth/logout` | Revoke current session; clear cookie; `200` | `auth.logout` | compatible; preserve idempotence |
-| `POST /api/auth/register-team` | Pending registration; `202` with verification ID; no raw password/code persistence | `teams.begin_registration` | compatible; preserve repeat semantics |
-| `POST /api/auth/join-team` | Pending participant invite registration; `202` | `teams.begin_join` | compatible; preserve invite policy |
+| `POST /api/auth/register-team` | Immediately creates the captain account and session; `201`; no email confirmation | `teams.register` | intentional-change; create session without a verification step |
+| `POST /api/auth/join-team` | Immediately creates an invited participant account and session; `201`; no email confirmation | `teams.register` | intentional-change; preserve invite policy and create session directly |
 | `POST /api/auth/student-card/stream` | Anonymous bounded image stream; `201` upload + registration claim | `media.registration_stream` | compatible; preserve claim |
 | `POST /api/auth/student-card/intent` | Anonymous multipart intent; `201` claim | `media.registration_intent` | compatible; async Redis state |
 | `POST /api/auth/student-card/complete` | Claimed multipart completion; `201` upload + refreshed claim | `media.registration_complete` | compatible; verify claim/owner |
-| `POST /api/auth/verify-email` | Code verification; creates user/session; `201` | `auth.verify_email` | compatible; preserve HMAC/attempts |
-| `POST /api/auth/resend-email-code` | Refresh code for pending registration; `200` | `auth.resend_email_code` | compatible; preserve cooldown |
+| `POST /api/auth/verify-email` | Legacy pending-registration completion endpoint; current registration does not use it | `auth.verify_email` | legacy; normal signup does not require an email code |
+| `POST /api/auth/resend-email-code` | Legacy pending-registration resend endpoint; current registration does not use it | `auth.resend_email_code` | legacy; normal signup does not send a verification email |
 | `GET /api/invites/{code}` | Public active, unexpired invite projection; `404`/rate limit | `teams.get_invite` | compatible; preserve normalization |
 
 ## Participant operations

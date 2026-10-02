@@ -21,8 +21,8 @@ services:
       LUG_UPLOAD_SCANNER_PORT: "3310"
       LUG_UPLOAD_SCANNER_TIMEOUT_SECONDS: "30"
       LUG_UPLOAD_SCAN_REQUIRED: "true"
-      LUG_ADMIN_EMAIL: admin@lug.local
-      LUG_ADMIN_PASSWORD: Strong!Admin1
+      LUG_ADMIN_EMAIL: ${LUG_ADMIN_EMAIL:?Set LUG_ADMIN_EMAIL in backend/.env}
+      LUG_ADMIN_PASSWORD: ${LUG_ADMIN_PASSWORD:?Set LUG_ADMIN_PASSWORD in backend/.env}
       LUG_EMAIL_MODE: smtp
       LUG_EMAIL_LOG_CODE: "false"
       LUG_SMTP_HOST: mailpit
@@ -31,7 +31,7 @@ services:
       LUG_SMTP_STARTTLS: "false"
       LUG_SMTP_SSL: "false"
     ports:
-      - "8000:8000"
+      - "127.0.0.1:4174:8000"
     depends_on:
       postgres:
         condition: service_healthy

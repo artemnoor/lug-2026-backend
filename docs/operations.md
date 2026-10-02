@@ -29,8 +29,9 @@ reuse the development credentials from Compose.
 
 Logs are JSON and include `request_id`, `trace_id`, HTTP method/path/status and
 duration. Sensitive values are redacted. Search by request ID first, then check
-`/ready` and dependency logs. A failed email delivery does not roll back a
-committed registration; resend the verification code or inspect SMTP health.
+`/ready` and dependency logs. Registration creates an account without sending
+email. If a password-reset email is not delivered, inspect SMTP health and issue
+a new reset request; a failed delivery does not roll back committed account data.
 
 Do not expose `/metrics`, `/ready` or admin routes publicly without the configured
 operations/admin controls.
