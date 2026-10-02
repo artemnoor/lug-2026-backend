@@ -196,7 +196,9 @@ def test_registration_accepts_pdf_student_card(client):
     upload = client.post(
         "/api/auth/student-card/stream",
         content=pdf,
-        headers=csrf_headers(client, **{"X-Upload-Name": "card.pdf", "Content-Type": "application/pdf"}),
+        headers=csrf_headers(
+            client, **{"X-Upload-Name": "card.pdf", "Content-Type": "application/pdf"}
+        ),
     )
     assert upload.status_code == 201, upload.text
     upload_data = upload.json()
