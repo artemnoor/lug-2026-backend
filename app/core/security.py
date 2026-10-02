@@ -32,15 +32,9 @@ def valid_email(value: str) -> bool:
 
 
 def strong_password(value: str) -> bool:
-    """Preserve the reference policy while using Argon2id as the default hash."""
+    """Require a usable length without forcing arbitrary character classes."""
 
-    return (
-        len(value) >= 8
-        and bool(re.search(r"[a-z]", value))
-        and bool(re.search(r"[A-Z]", value))
-        and bool(re.search(r"\d", value))
-        and bool(re.search(r"[^A-Za-z0-9]", value))
-    )
+    return len(value) >= 8
 
 
 async def hash_password(password: str) -> str:

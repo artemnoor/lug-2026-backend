@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import re
 
 from sqlalchemy import select
 
@@ -123,11 +122,11 @@ def test_csrf_and_admin_login(client):
     assert client.get("/api/admin/overview").status_code == 200
 
 
-def test_registration_upload_verification_dashboard_and_private_file(client):
-    captured: dict[str, str] = {}
+def test_registration_dashboard_and_private_file_without_email_confirmation(client):
+    sent_messages: list[str] = []
 
     async def capture(recipient: str, subject: str, text: str, html: str = ""):
-        captured["text"] = text
+        sent_messages.append(recipient)
 
     client.get("/api/session")
     client.app.state.container.email.send = capture
@@ -146,7 +145,7 @@ def test_registration_upload_verification_dashboard_and_private_file(client):
             "teamName": "QA команда",
             "totalStudentsInGroup": 1,
             "email": "captain@example.test",
-            "password": "Strong!Test1",
+            "password": "password123",
             "messenger": "telegram",
             "messengerContact": "@qa_test",
             "studentCardFile": upload_data["url"],
@@ -158,20 +157,24 @@ def test_registration_upload_verification_dashboard_and_private_file(client):
         },
         headers=csrf_headers(client),
     )
-    assert registration.status_code == 202, registration.text
-    code_match = re.search(r"(\d{6})", captured["text"])
-    assert code_match
-    verification = client.post(
-        "/api/auth/verify-email",
-        json={"verificationId": registration.json()["verificationId"], "code": code_match[1]},
-        headers=csrf_headers(client),
-    )
-    assert verification.status_code == 201, verification.text
+    assert registration.status_code == 201, registration.text
+    assert "lug_session" in client.cookies
+    assert registration.json()["user"]["emailVerified"] is False
+    assert sent_messages == []
     dashboard = client.get("/api/dashboard")
     assert dashboard.status_code == 200, dashboard.text
     assert dashboard.json()["team"]["group"] == "QA-1"
+    assert dashboard.json()["user"]["emailVerified"] is False
     assert client.get(upload_data["url"]).status_code == 200
     assert client.head(upload_data["url"]).status_code == 200
+
+    client.post("/api/auth/logout", headers=csrf_headers(client))
+    login = client.post(
+        "/api/auth/login",
+        json={"email": "captain@example.test", "password": "password123"},
+        headers=csrf_headers(client),
+    )
+    assert login.status_code == 200, login.text
 
     async def mark_upload_rejected():
         async with client.app.state.container.new_uow() as uow:
@@ -185,3 +188,112 @@ def test_registration_upload_verification_dashboard_and_private_file(client):
     blocked = client.get(upload_data["url"])
     assert blocked.status_code == 403
     assert blocked.json()["code"] == "UPLOAD_SCAN_PENDING"
+
+
+def test_registration_accepts_pdf_student_card(client):
+    client.get("/api/session")
+    pdf = b"%PDF-1.4\n%%EOF\n"
+    upload = client.post(
+        "/api/auth/student-card/stream",
+        content=pdf,
+        headers=csrf_headers(client, **{"X-Upload-Name": "card.pdf", "Content-Type": "application/pdf"}),
+    )
+    assert upload.status_code == 201, upload.text
+    upload_data = upload.json()
+    registration = client.post(
+        "/api/auth/register-team",
+        json={
+            "fio": "PDF капитан",
+            "group": "PDF-1",
+            "teamName": "PDF команда",
+            "totalStudentsInGroup": 1,
+            "email": "pdf-captain@example.test",
+            "password": "password123",
+            "messenger": "telegram",
+            "messengerContact": "@pdf_test",
+            "studentCardFile": upload_data["url"],
+            "studentCardFileName": "card.pdf",
+            "studentCardUploadToken": upload_data["registrationToken"],
+            "studentCardSize": upload_data["size"],
+            "studentCardType": upload_data["contentType"],
+            "consent": True,
+        },
+        headers=csrf_headers(client),
+    )
+    assert registration.status_code == 201, registration.text
+
+
+def test_invited_participant_registers_without_group_or_email_code(client):
+    sent_messages: list[str] = []
+
+    async def capture(recipient: str, subject: str, text: str, html: str = ""):
+        sent_messages.append(recipient)
+
+    client.get("/api/session")
+    client.app.state.container.email.send = capture
+
+    def upload_card(name: str):
+        response = client.post(
+            "/api/auth/student-card/stream",
+            content=PNG,
+            headers=csrf_headers(client, **{"X-Upload-Name": name, "Content-Type": "image/png"}),
+        )
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    captain_card = upload_card("captain.png")
+    captain = client.post(
+        "/api/auth/register-team",
+        json={
+            "fio": "Капитан команды",
+            "group": "JOIN-1",
+            "teamName": "Команда приглашений",
+            "totalStudentsInGroup": 2,
+            "email": "join-captain@example.test",
+            "password": "капитанпароль",
+            "messenger": "telegram",
+            "messengerContact": "@join_captain",
+            "studentCardFile": captain_card["url"],
+            "studentCardUploadToken": captain_card["registrationToken"],
+            "studentCardSize": captain_card["size"],
+            "studentCardType": captain_card["contentType"],
+            "consent": True,
+        },
+        headers=csrf_headers(client),
+    )
+    assert captain.status_code == 201, captain.text
+    invite_code = client.get("/api/dashboard").json()["team"]["inviteCode"]
+
+    member_card = upload_card("member.png")
+    member = client.post(
+        "/api/auth/join-team",
+        json={
+            "fio": "Участник команды",
+            "email": "join-member@example.test",
+            "password": "парольтолько",
+            "inviteCode": invite_code,
+            "messenger": "telegram",
+            "messengerContact": "@join_member",
+            "studentCardFile": member_card["url"],
+            "studentCardUploadToken": member_card["registrationToken"],
+            "studentCardSize": member_card["size"],
+            "studentCardType": member_card["contentType"],
+            "consent": True,
+        },
+        headers=csrf_headers(client),
+    )
+    assert member.status_code == 201, member.text
+    assert member.json()["user"]["emailVerified"] is False
+    dashboard = client.get("/api/dashboard")
+    assert dashboard.status_code == 200, dashboard.text
+    assert dashboard.json()["team"]["group"] == "JOIN-1"
+    assert len(dashboard.json()["team"]["members"]) == 2
+    assert sent_messages == []
+
+    client.post("/api/auth/logout", headers=csrf_headers(client))
+    login = client.post(
+        "/api/auth/login",
+        json={"email": "join-member@example.test", "password": "парольтолько"},
+        headers=csrf_headers(client),
+    )
+    assert login.status_code == 200, login.text

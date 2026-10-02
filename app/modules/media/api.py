@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import unquote
+
 from fastapi import APIRouter, Request
 
 from ...api_models.media import (
@@ -19,6 +21,8 @@ router = APIRouter(prefix="/api", tags=["Media"])
 
 async def _stream_headers(request: Request) -> tuple[str, str, int]:
     name = request.headers.get("X-Upload-Name", "").strip()
+    if request.headers.get("X-Upload-Name-Encoding") == "percent-encoded-utf8":
+        name = unquote(name, encoding="utf-8", errors="replace")
     content_type = request.headers.get("content-type", "").split(";", 1)[0].strip()
     declared = request.headers.get("content-length", "0")
     size = int(declared) if declared.isdigit() else 0

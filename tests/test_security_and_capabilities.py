@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
 
 
@@ -12,10 +10,10 @@ def _csrf(client, **extra):
 
 
 def _register(client, email: str, fio: str = "Капитан тестовой команды") -> dict:
-    captured: dict[str, str] = {}
+    sent_messages: list[str] = []
 
     async def capture(recipient: str, subject: str, text: str, html: str = ""):
-        captured["text"] = text
+        sent_messages.append(recipient)
 
     client.get("/api/session")
     client.app.state.container.email.send = capture
@@ -34,7 +32,7 @@ def _register(client, email: str, fio: str = "Капитан тестовой к
             "teamName": "Security Team",
             "totalStudentsInGroup": 1,
             "email": email,
-            "password": "Strong!Test1",
+            "password": "password123",
             "messenger": "telegram",
             "messengerContact": "@security_test",
             "studentCardFile": upload_data["url"],
@@ -46,16 +44,11 @@ def _register(client, email: str, fio: str = "Капитан тестовой к
         },
         headers=_csrf(client),
     )
-    assert registration.status_code == 202, registration.text
-    code = re.search(r"(\d{6})", captured["text"])
-    assert code
-    verified = client.post(
-        "/api/auth/verify-email",
-        json={"verificationId": registration.json()["verificationId"], "code": code[1]},
-        headers=_csrf(client),
-    )
-    assert verified.status_code == 201, verified.text
-    return verified.json()["user"]
+    assert registration.status_code == 201, registration.text
+    assert "lug_session" in client.cookies
+    assert sent_messages == []
+    assert client.get("/api/dashboard").status_code == 200
+    return registration.json()["user"]
 
 
 def test_anonymous_and_participant_authorization(client):
@@ -121,6 +114,9 @@ def test_admin_review_and_notification_visibility(client):
         headers=_csrf(client),
     )
     assert admin_login.status_code == 200, admin_login.text
+    overview = client.get("/api/admin/overview")
+    assert overview.status_code == 200, overview.text
+    assert any(user["email"] == "review-target@example.test" for user in overview.json()["users"])
     team_id = participant["teamId"]
     assert (
         client.patch(
@@ -175,7 +171,7 @@ def test_admin_review_and_notification_visibility(client):
 
     participant_login = client.post(
         "/api/auth/login",
-        json={"email": "review-target@example.test", "password": "Strong!Test1"},
+        json={"email": "review-target@example.test", "password": "password123"},
         headers=_csrf(client),
     )
     assert participant_login.status_code == 200, participant_login.text

@@ -119,8 +119,10 @@ class SqlAlchemyTeamRepository(TeamRepository):
         row.last_sent_at = now
         await self.session.flush()
 
-    async def commit_pending(self, row: EmailVerificationRow, now: datetime) -> UserRow:
-        values = dict(row.payload)
+    async def create_registered(
+        self, values: dict[str, Any], now: datetime, email_verified: bool = False
+    ) -> UserRow:
+        values = dict(values)
         team: TeamRow | None = None
         if values.get("kind") == "participant":
             invite_code = str(values.get("inviteCode", "")).upper()
@@ -147,8 +149,8 @@ class SqlAlchemyTeamRepository(TeamRepository):
             await self.session.flush()
         user = UserRow(
             id=str(uuid4()),
-            email=row.email,
-            password_hash=row.password_hash,
+            email=values["email"],
+            password_hash=values["passwordHash"],
             role="participant",
             fio=str(values.get("fio", "")).strip(),
             phone=str(values.get("phone") or "").strip() or None,
@@ -156,7 +158,7 @@ class SqlAlchemyTeamRepository(TeamRepository):
             messenger_contact=str(values.get("messengerContact") or "").strip(),
             telegram_account=str(values.get("telegramAccount") or "").strip(),
             team_id=team.id,
-            email_verified=True,
+            email_verified=email_verified,
             identity_status="pending",
             student_card_file=str(values.get("studentCardFile") or ""),
             consent_at=now,
@@ -165,9 +167,23 @@ class SqlAlchemyTeamRepository(TeamRepository):
         await self.session.flush()
         if team.captain_id is None:
             team.captain_id = user.id
+        await self.session.flush()
+        return user
+
+    async def commit_pending(self, row: EmailVerificationRow, now: datetime) -> UserRow:
+        values = dict(row.payload)
+        values["email"] = row.email
+        values["passwordHash"] = row.password_hash
+        user = await self.create_registered(values, now, email_verified=True)
         await self.session.delete(row)
         await self.session.flush()
         return user
+
+    async def discard_pending_by_email(self, email: str) -> None:
+        row = await self.get_pending_by_email(email)
+        if row is not None:
+            await self.session.delete(row)
+            await self.session.flush()
 
     async def update_team(self, team: TeamRow, changes: dict[str, Any]) -> None:
         for key, value in changes.items():

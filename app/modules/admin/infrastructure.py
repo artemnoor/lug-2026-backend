@@ -67,7 +67,7 @@ class SqlAlchemyAdminRepository(AdminRepository):
         users = list(
             (
                 await self.session.scalars(
-                    select(UserRow).where(UserRow.role != "admin", UserRow.email_verified.is_(True))
+                    select(UserRow).where(UserRow.role != "admin")
                 )
             ).all()
         )
