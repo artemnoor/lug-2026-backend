@@ -45,22 +45,28 @@ Production/staging configuration намеренно отказывается с�
 wildcard hosts, короткими secrets, неявным operations token или logging
 verification codes.
 
-## Миграции и запуск через Docker
+## Миграции и единый Docker Compose
 
 Миграция `0001_initial_schema` создаёт таблицы и индексы через явные Alembic
-operations; startup не выполняет DDL. Для локального полного окружения:
+operations; startup не выполняет DDL. Общая Compose-конфигурация сайта и backend
+находится в корне основного репозитория [`artemnoor/lug-2026`](https://github.com/artemnoor/lug-2026/blob/main/docker-compose.yml).
+Она запускает web, API, PostgreSQL, Redis, MinIO, ClamAV и Mailpit одной командой.
+Из корня `lug-2026` выполните:
 
 ```powershell
-docker compose up --build
+Copy-Item .env.example .env
+docker compose up --build -d
 ```
 
-Compose поднимает полный локальный dependency set: API, PostgreSQL, Redis,
-MinIO (S3-compatible storage с автоматическим bucket init), ClamAV `clamd` и
-Mailpit. UI MinIO доступен на `http://localhost:9001`, Mailpit — на
-`http://localhost:8025`; API использует их через сетевые adapters, поэтому
-локальная конфигурация проверяет тот же integration path, что и deployment.
-В production эти контейнеры можно заменить managed S3/ClamAV/SMTP, сохранив
-те же typed configuration seams.
+Откройте сайт на `http://127.0.0.1:4173/`, API — на `http://127.0.0.1:4174/`,
+MinIO Console — на `http://127.0.0.1:9001/`, Mailpit — на
+`http://127.0.0.1:8025/`. Остановить стек без удаления данных можно командой
+`docker compose down`; для удаления локальных баз и файлов используйте
+`docker compose down --volumes`.
+
+Для backend-only разработки без полного Compose окружения используйте шаги
+раздела «Требования и локальный запуск» выше. Production configuration может
+заменить локальные S3/ClamAV/SMTP контейнеры управляемыми сервисами.
 
 ## Проверки
 

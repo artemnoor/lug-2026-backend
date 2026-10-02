@@ -2,11 +2,11 @@
 
 ## Decision
 
-Run MinIO, ClamAV and Mailpit in the local Compose environment and select them
-through typed settings. The API talks to ClamAV over the `clamd` network
-protocol, to MinIO through the existing S3 adapter, and to Mailpit through the
-existing SMTP adapter. Keep command-scanner and log-email modes for deployments
-that intentionally choose them.
+Run MinIO, ClamAV and Mailpit in the root Compose environment of the main
+`lug-2026` repository and select them through typed settings. The API talks to
+ClamAV over the `clamd` network protocol, to MinIO through the existing S3
+adapter, and to Mailpit through the existing SMTP adapter. Keep command-scanner
+and log-email modes for deployments that intentionally choose them.
 
 ## Rationale
 

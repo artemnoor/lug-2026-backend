@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 import pytest
 
@@ -13,19 +12,7 @@ from app.infrastructure.email import EmailService
 from app.infrastructure.scanner import build_scanner
 
 
-def test_compose_declares_real_s3_scanner_and_smtp_services():
-    compose = (Path(__file__).parents[1] / "docker-compose.yml").read_text(encoding="utf-8")
-    for service in ("backend", "minio", "minio-init", "clamav", "mailpit"):
-        assert f"  {service}:" in compose
-    assert "LUG_FILE_STORAGE_PROVIDER: s3" in compose
-    assert "LUG_S3_ENDPOINT_URL: http://minio:9000" in compose
-    assert "MINIO_KMS_SECRET_KEY:" in compose
-    assert "LUG_UPLOAD_SCANNER: clamav" in compose
-    assert "LUG_EMAIL_MODE: smtp" in compose
-    assert "LUG_SMTP_HOST: mailpit" in compose
-
-
-def test_compose_dependency_settings_are_typed():
+def test_local_dependency_settings_are_typed():
     settings = Settings.from_env(
         {
             "LUG_ENV": "development",
