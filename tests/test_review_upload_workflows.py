@@ -92,7 +92,9 @@ def test_registration_document_upload_rejects_unsafe_names_types_and_fake_conten
     unsupported_type = client.post(
         "/api/auth/student-card/stream",
         content=b"not a document",
-        headers=_csrf(client, **{"X-Upload-Name": "card.exe", "Content-Type": "application/octet-stream"}),
+        headers=_csrf(
+            client, **{"X-Upload-Name": "card.exe", "Content-Type": "application/octet-stream"}
+        ),
     )
     assert unsupported_type.status_code == 422
     assert unsupported_type.json()["code"] == "UPLOAD_INVALID_TYPE"
@@ -225,7 +227,12 @@ def test_portfolio_attachment_is_owned_and_cannot_be_reused_by_another_team(clie
     file_url = attachment.json()["url"]
     own_material = client.post(
         "/api/achievements",
-        json={"title": "Собственная работа", "direction": "science", "category": "Исследование", "fileUrl": file_url},
+        json={
+            "title": "Собственная работа",
+            "direction": "science",
+            "category": "Исследование",
+            "fileUrl": file_url,
+        },
         headers=_csrf(client),
     )
     assert own_material.status_code == 201, own_material.text
@@ -236,7 +243,12 @@ def test_portfolio_attachment_is_owned_and_cannot_be_reused_by_another_team(clie
     assert second["response"].status_code == 201, second["response"].text
     foreign_material = client.post(
         "/api/achievements",
-        json={"title": "Чужой файл", "direction": "science", "category": "Исследование", "fileUrl": file_url},
+        json={
+            "title": "Чужой файл",
+            "direction": "science",
+            "category": "Исследование",
+            "fileUrl": file_url,
+        },
         headers=_csrf(client),
     )
     assert foreign_material.status_code == 403
@@ -279,9 +291,7 @@ def test_admin_rejections_require_comments_and_return_them_to_participant(client
     comment = "Пожалуйста, исправьте документ и отправьте повторно."
     accepted_responses = []
     for path, payload in review_targets:
-        response = client.patch(
-            path, json={**payload, "comment": comment}, headers=_csrf(client)
-        )
+        response = client.patch(path, json={**payload, "comment": comment}, headers=_csrf(client))
         assert response.status_code == 200, response.text
         accepted_responses.append(response.json())
 
