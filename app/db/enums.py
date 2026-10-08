@@ -1,8 +1,9 @@
 """Persisted enum values shared by models and contracts."""
 
 ROLE_PARTICIPANT = "participant"
+ROLE_CAPTAIN = "captain"
 ROLE_ADMIN = "admin"
-USER_ROLES = (ROLE_PARTICIPANT, ROLE_ADMIN)
+USER_ROLES = (ROLE_PARTICIPANT, ROLE_CAPTAIN, ROLE_ADMIN)
 IDENTITY_STATUSES = ("pending", "approved", "rejected")
 REVIEW_STATUSES = ("none", "pending", "approved", "rejected")
 UPLOAD_STATUSES = ("pending", "uploaded", "scanning", "clean", "rejected")

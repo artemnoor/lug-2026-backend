@@ -9,6 +9,7 @@ from uuid import uuid4
 from sqlalchemy import select, update
 
 from ...common.time import now_utc, parse_datetime
+from ...db.enums import ROLE_CAPTAIN, ROLE_PARTICIPANT
 from ...db.models import AuditLogRow, EmailVerificationRow, SettingRow, TeamRow, UserRow
 from ..content.contracts import default_settings
 from .ports import TeamRepository
@@ -151,7 +152,7 @@ class SqlAlchemyTeamRepository(TeamRepository):
             id=str(uuid4()),
             email=values["email"],
             password_hash=values["passwordHash"],
-            role="participant",
+            role=ROLE_PARTICIPANT if values.get("kind") == "participant" else ROLE_CAPTAIN,
             fio=str(values.get("fio", "")).strip(),
             phone=str(values.get("phone") or "").strip() or None,
             messenger=str(values.get("messenger") or "").strip(),

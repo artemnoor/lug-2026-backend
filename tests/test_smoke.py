@@ -264,6 +264,7 @@ def test_invited_participant_registers_without_group_or_email_code(client):
         headers=csrf_headers(client),
     )
     assert captain.status_code == 201, captain.text
+    assert captain.json()["user"]["role"] == "captain"
     invite_code = client.get("/api/dashboard").json()["team"]["inviteCode"]
 
     member_card = upload_card("member.png")
@@ -285,6 +286,7 @@ def test_invited_participant_registers_without_group_or_email_code(client):
         headers=csrf_headers(client),
     )
     assert member.status_code == 201, member.text
+    assert member.json()["user"]["role"] == "participant"
     assert member.json()["user"]["emailVerified"] is False
     dashboard = client.get("/api/dashboard")
     assert dashboard.status_code == 200, dashboard.text

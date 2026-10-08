@@ -51,7 +51,7 @@ def _register(client, email: str, fio: str = "Капитан тестовой к
     return registration.json()["user"]
 
 
-def test_anonymous_and_participant_authorization(client):
+def test_anonymous_and_captain_authorization(client):
     assert client.get("/api/dashboard").status_code == 401
     assert client.get("/api/admin/overview").status_code == 401
     invalid_upload = client.post(
@@ -62,7 +62,7 @@ def test_anonymous_and_participant_authorization(client):
     assert invalid_upload.status_code == 422
     user = _register(client, "participant@example.test")
 
-    assert user["role"] == "participant"
+    assert user["role"] == "captain"
     assert client.get("/api/admin/overview").status_code == 403
 
     profile = client.patch("/api/me", json={"fio": "Обновлённый капитан"}, headers=_csrf(client))

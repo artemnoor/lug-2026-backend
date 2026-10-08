@@ -43,6 +43,11 @@ def team_view(row: Any, members: list[dict[str, Any]] | None = None) -> dict[str
         "quotaConfirmed": row.quota_confirmed,
         "isQuotaConfirmed": row.quota_confirmed,
         "isAdmitted": row.is_admitted,
+        "reviewNameStatus": row.review_name_status,
+        "reviewGroupStatus": row.review_group_status,
+        "reviewFlagStatus": row.review_flag_status,
+        "reviewDescriptionStatus": row.review_description_status,
+        "reviewComment": row.review_comment,
         "videoCard": video_view(row),
         "members": members or [],
     }
